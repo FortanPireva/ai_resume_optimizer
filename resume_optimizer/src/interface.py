@@ -7,7 +7,7 @@ from .document_processor import DocumentProcessor
 
 def create_interface(optimizer: ResumeOptimizer, processor: DocumentProcessor) -> gr.Interface:
     """
-    Create the main Gradio interface.
+    Create the main interface for resume generation.
     
     Parameters:
         optimizer (ResumeOptimizer): Instance of the resume optimizer
@@ -22,7 +22,7 @@ def create_interface(optimizer: ResumeOptimizer, processor: DocumentProcessor) -
         optimization_level: str
     ) -> Tuple[str, str, str]:
         """
-        Core optimization function that processes user inputs.
+        Generate a tailored resume from the uploaded base resume.
         
         Parameters:
             resume_file (BinaryIO): Uploaded resume file
@@ -38,12 +38,12 @@ def create_interface(optimizer: ResumeOptimizer, processor: DocumentProcessor) -
         # Adjust temperature based on optimization level
         temperature = {
             "Conservative": 0.3,
-            "Balanced": 0.7,
-            "Aggressive": 0.9
-        }.get(optimization_level, 0.7)
+            "Balanced": 0.4,
+            "Aggressive": 0.5
+        }.get(optimization_level, 0.4)
         
-        # Get AI optimization with adjusted temperature
-        optimized_content = optimizer.analyze_resume(
+        # Generate tailored resume
+        tailored_content = optimizer.generate_tailored_resume(
             resume_text,
             job_description,
             temperature=temperature
@@ -51,7 +51,7 @@ def create_interface(optimizer: ResumeOptimizer, processor: DocumentProcessor) -
         
         # Convert to different formats
         outputs = processor.convert_to_formats(
-            optimized_content,
+            tailored_content,
             css_file="templates/style.css"
         )
         
@@ -72,29 +72,34 @@ def create_interface(optimizer: ResumeOptimizer, processor: DocumentProcessor) -
         fn=optimize_resume,
         inputs=[
             gr.File(
-                label="Upload Your Resume",
+                label="Upload Your Base Resume",
                 file_types=[".pdf", ".docx", ".txt"]
             ),
             gr.Textbox(
                 label="Job Description",
-                placeholder="Paste the job description here...",
-                lines=5
+                placeholder="Paste the complete job description here...",
+                lines=8
             ),
             gr.Radio(
                 choices=["Conservative", "Balanced", "Aggressive"],
                 label="Optimization Level",
-                value="Balanced"
+                value="Balanced",
+                info="Conservative: Minimal changes, Balanced: Moderate optimization, Aggressive: Extensive rewriting"
             )
         ],
         outputs=[
-            gr.Markdown(label="Optimization Suggestions"),
-            gr.HTML(label="Resume Preview"),
-            gr.File(label="Download Optimized Resume")
+            gr.Markdown(label="Preview Your Tailored Resume"),
+            gr.HTML(label="Web Version"),
+            gr.File(label="Download Resume")
         ],
-        title="AI Resume Optimizer",
+        title="AI Resume Tailoring System",
         description="""
-        Upload your resume and paste a job description to get AI-powered optimization suggestions.
-        The tool will analyze keyword alignment, experience relevance, and provide ATS-friendly improvements.
+        Upload your base resume and paste a job description to get a professionally tailored resume.
+        The system will:
+        - Match skills and qualifications to the job requirements
+        - Rewrite experiences to highlight relevant achievements
+        - Optimize formatting for ATS compatibility
+        - Maintain truthful information while enhancing impact
         """,
         theme="default",
         allow_flagging="never"

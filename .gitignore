@@ -41,3 +41,6 @@ env/
 !requirements.txt
 temp/
 *.log 
+
+# Documentation
+*/**/blog.md

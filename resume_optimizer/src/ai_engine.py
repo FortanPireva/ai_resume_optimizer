@@ -5,55 +5,49 @@ from openai import OpenAI
 from dotenv import load_dotenv
 
 class PromptTemplates:
-    RESUME_ANALYSIS = Template('''
-    Analyze the following resume and job description. Provide optimization suggestions:
+    CONTENT_TRANSFORMATION = Template('''
+    Transform the following resume content to perfectly match this job description.
     
-    RESUME:
+    BASE RESUME:
     $resume_text
     
-    JOB DESCRIPTION:
+    TARGET JOB DESCRIPTION:
     $job_description
     
-    Please provide a detailed analysis covering:
-    1. Keyword Alignment Analysis
-       - Identify matching keywords
-       - Highlight missing important terms
-       - Suggest synonym alternatives
-       
-    2. Experience and Qualifications
-       - Assess experience relevance
-       - Identify gaps in qualifications
-       - Suggest ways to better highlight relevant experience
-       
-    3. Content and Structure
-       - Evaluate section organization
-       - Assess bullet point effectiveness
-       - Recommend structural improvements
-       
-    4. ATS Optimization
-       - Check formatting compatibility
-       - Verify keyword placement
-       - Assess overall ATS friendliness
+    Create a completely tailored resume that:
+    1. Matches the exact skills and qualifications mentioned in the job post
+    2. Rewords experiences to highlight relevant achievements
+    3. Prioritizes information based on job requirements
+    4. Uses industry-specific terminology from the job description
+    5. Maintains professional tone and formatting
     
-    Format the response in markdown with clear sections and examples.
+    Important requirements:
+    - Preserve truthful information from the original resume
+    - Include all relevant experience from the original resume
+    - Format in clear, ATS-friendly markdown
+    - Use strong action verbs and quantifiable achievements
+    - Maintain professional formatting
+    
+    Generate the complete resume in markdown format.
     ''')
-
-    BULLET_POINT_OPTIMIZER = Template('''
-    Optimize the following bullet points for impact and clarity:
     
-    ORIGINAL BULLETS:
-    $bullet_points
+    EXPERIENCE_TAILORING = Template('''
+    Rewrite these experience entries to align with the target job requirements:
+    
+    ORIGINAL EXPERIENCE:
+    $experience_entries
     
     JOB REQUIREMENTS:
     $requirements
     
-    For each bullet point:
-    1. Start with strong action verbs
-    2. Include quantifiable achievements
-    3. Incorporate relevant keywords
-    4. Maintain ATS-friendly formatting
+    For each entry:
+    1. Emphasize relevant skills and achievements
+    2. Use terminology from the job description
+    3. Quantify impacts where possible
+    4. Start with strong action verbs
+    5. Maintain factual accuracy
     
-    Return the optimized bullet points in markdown format.
+    Return the tailored experience entries in markdown format.
     ''')
 
 class ResumeOptimizer:
@@ -85,43 +79,36 @@ class ResumeOptimizer:
         
         return response.choices[0].message.content
     
-    def analyze_resume(self, resume_text: str, job_description: str, temperature: float = 0.7) -> str:
+    def generate_tailored_resume(self, resume_text: str, job_description: str, temperature: float = 0.4) -> str:
         """
-        Perform complete resume analysis and optimization.
+        Generate a completely tailored resume for the target job.
         
         Parameters:
-            resume_text (str): The text content of the resume
-            job_description (str): The job description text
-            temperature (float): Controls response creativity
+            resume_text (str): The original resume text
+            job_description (str): The target job description
+            temperature (float): Controls output creativity
             
         Returns:
-            str: Detailed analysis and optimization suggestions
+            str: The tailored resume in markdown format
         """
-        analysis_prompt = self.templates.RESUME_ANALYSIS.substitute(
+        # Generate the tailored resume content
+        generation_prompt = self.templates.CONTENT_TRANSFORMATION.substitute(
             resume_text=resume_text,
             job_description=job_description
         )
         
-        return self.get_completion(analysis_prompt, temperature=temperature)
-    
-    def optimize_bullet_points(self, bullet_points: List[str], requirements: str) -> str:
-        """
-        Optimize resume bullet points for better impact.
-        
-        Parameters:
-            bullet_points (List[str]): List of original bullet points
-            requirements (str): Job requirements text
-            
-        Returns:
-            str: Optimized bullet points
-        """
-        bullet_points_text = "\n".join(bullet_points)
-        optimization_prompt = self.templates.BULLET_POINT_OPTIMIZER.substitute(
-            bullet_points=bullet_points_text,
-            requirements=requirements
+        # Get the AI to create the tailored resume
+        tailored_resume = self.get_completion(
+            generation_prompt,
+            temperature=temperature
         )
         
-        return self.get_completion(optimization_prompt)
+        # Enhance specific sections
+        sections = self.extract_sections(tailored_resume)
+        enhanced_sections = self.enhance_sections(sections, job_description)
+        
+        # Combine into final resume
+        return self.combine_sections(enhanced_sections)
     
     def extract_sections(self, resume_text: str) -> Dict[str, str]:
         """
@@ -133,24 +120,91 @@ class ResumeOptimizer:
         Returns:
             Dict[str, str]: Dictionary of section names and their content
         """
-        # This is a simplified implementation
-        # In a real application, you'd want more sophisticated section detection
         sections = {}
         current_section = "General"
         current_content = []
         
         for line in resume_text.split('\n'):
-            if line.strip().isupper() and len(line.strip()) > 0:
-                # Assume uppercase lines are section headers
+            if line.strip().startswith('#'):  # Markdown headers indicate sections
                 if current_content:
-                    sections[current_section] = '\n'.join(current_content)
-                current_section = line.strip()
+                    sections[current_section.lower()] = '\n'.join(current_content)
+                current_section = line.strip('#').strip()
                 current_content = []
             else:
                 current_content.append(line)
         
         # Add the last section
         if current_content:
-            sections[current_section] = '\n'.join(current_content)
+            sections[current_section.lower()] = '\n'.join(current_content)
             
-        return sections 
+        return sections
+    
+    def enhance_sections(self, sections: Dict[str, str], job_description: str) -> Dict[str, str]:
+        """
+        Further enhance each section of the generated resume.
+        
+        Parameters:
+            sections (Dict[str, str]): Original sections
+            job_description (str): Target job description
+            
+        Returns:
+            Dict[str, str]: Enhanced sections
+        """
+        enhanced = {}
+        
+        for section_name, content in sections.items():
+            if 'experience' in section_name.lower():
+                enhanced[section_name] = self.enhance_experience(content, job_description)
+            else:
+                enhanced[section_name] = content
+                
+        return enhanced
+    
+    def enhance_experience(self, experience_content: str, job_description: str) -> str:
+        """
+        Enhance experience entries to better match job requirements.
+        
+        Parameters:
+            experience_content (str): Original experience content
+            job_description (str): Target job description
+            
+        Returns:
+            str: Enhanced experience content
+        """
+        prompt = self.templates.EXPERIENCE_TAILORING.substitute(
+            experience_entries=experience_content,
+            requirements=job_description
+        )
+        
+        return self.get_completion(prompt, temperature=0.3)
+    
+    def combine_sections(self, sections: Dict[str, str]) -> str:
+        """
+        Combine enhanced sections back into a complete resume.
+        
+        Parameters:
+            sections (Dict[str, str]): Enhanced sections
+            
+        Returns:
+            str: Complete resume in markdown format
+        """
+        # Define section order
+        section_order = [
+            'summary', 'experience', 'skills', 'education', 'certifications',
+            'projects', 'publications', 'awards', 'languages', 'interests'
+        ]
+        
+        # Combine sections in order
+        resume_parts = []
+        for section in section_order:
+            for name, content in sections.items():
+                if section in name.lower():
+                    resume_parts.append(f"# {name.title()}\n\n{content.strip()}\n")
+                    break
+        
+        # Add any remaining sections not in the predefined order
+        for name, content in sections.items():
+            if not any(section in name.lower() for section in section_order):
+                resume_parts.append(f"# {name.title()}\n\n{content.strip()}\n")
+        
+        return '\n'.join(resume_parts) 
