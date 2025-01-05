@@ -43,4 +43,4 @@ temp/
 *.log 
 
 # Documentation
-*/**/blog.md
+blog.md
